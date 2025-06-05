@@ -626,11 +626,20 @@ class StockWidget(QWidget):
             if df_fallback.empty:
                 ax.text(0.5, 0.5, f"No data for {symbol}.", va="center", ha="center", fontsize=12, alpha=0.6)
             else:
-                # Convert to Python datetime + float arrays
-                x_vals = df_fallback["timestamp"].dt.to_pydatetime()
-                y_vals = df_fallback["price"].astype(float).to_numpy()
-                ax.plot(x_vals, y_vals, marker="o", linestyle="-", alpha=0.7)
-                ax.set_title(f"No data in last {timeframe.lower()}. Showing last {len(df_fallback)} points.")
+                # Sanitize price column to ensure numeric values
+                df_fallback["price"] = pd.to_numeric(df_fallback["price"], errors="coerce")
+                df_fallback.dropna(subset=["price"], inplace=True)
+
+                if df_fallback.empty:
+                    ax.text(0.5, 0.5, "No data", va="center", ha="center", fontsize=12, alpha=0.6)
+                else:
+                    # Convert to Python datetime + float arrays
+                    x_vals = df_fallback["timestamp"].dt.to_pydatetime()
+                    y_vals = df_fallback["price"].to_numpy(float)
+                    ax.plot(x_vals, y_vals, marker="o", linestyle="-", alpha=0.7)
+                    ax.set_title(
+                        f"No data in last {timeframe.lower()}. Showing last {len(df_fallback)} points."
+                    )
             ax.set_xlabel("Time")
             ax.set_ylabel("Price (USD)")
             ax.tick_params(axis="x", rotation=45)
@@ -639,9 +648,19 @@ class StockWidget(QWidget):
             return
 
         ax = self.figure.subplots()
+        df["price"] = pd.to_numeric(df["price"], errors="coerce")
+        df.dropna(subset=["price"], inplace=True)
+
+        if df.empty:
+            ax.text(0.5, 0.5, "No data", va="center", ha="center", fontsize=12, alpha=0.6)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            self.canvas.draw()
+            return
+
         # Convert to Python datetime + float arrays
         x_vals = df["timestamp"].dt.to_pydatetime()
-        y_vals = df["price"].astype(float).to_numpy()
+        y_vals = df["price"].to_numpy(float)
         ax.plot(x_vals, y_vals, marker="o", linestyle="-", alpha=0.8)
         ax.set_title(f"{symbol} price over last {timeframe.lower()}")
         ax.set_xlabel("Time")
