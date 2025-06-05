@@ -197,6 +197,7 @@ class StockWidget(QWidget):
 
         # 3a) Price labels area
         self.label_map = {}
+        self.price_labels_layout = None
         self._populate_price_labels(main_layout)
 
         # 3b) Controls for “which symbol” and “which timeframe”
@@ -258,14 +259,22 @@ class StockWidget(QWidget):
         At startup (or when symbols change), create one QLabel per symbol,
         showing “SYMBOL: Fetching…” initially. These live at the top of the UI.
         """
-        # If labels already exist, remove them first
-        for lbl in self.label_map.values():
-            parent_layout.removeWidget(lbl)
-            lbl.deleteLater()
+        # Remove any existing label layout and widgets
+        if self.price_labels_layout is not None:
+            while self.price_labels_layout.count() > 0:
+                item = self.price_labels_layout.takeAt(0)
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
+            parent_layout.removeItem(self.price_labels_layout)
+            self.price_labels_layout.deleteLater()
+            self.price_labels_layout = None
+
         self.label_map.clear()
 
-        # Create a horizontal layout to hold them
+        # Create a new horizontal layout to hold them
         row_layout = QHBoxLayout()
+        self.price_labels_layout = row_layout
         with self.symbols_lock:
             symbols_snapshot = sorted(self.symbols)
 
