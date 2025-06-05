@@ -26,9 +26,19 @@ from PyQt5.QtWidgets import (
     QInputDialog,
     QWidget,
     QMessageBox,
+    QSpinBox,
 )
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import (
+    FigureCanvasQTAgg as FigureCanvas,
+    NavigationToolbar2QT as NavigationToolbar,
+)
 from matplotlib.figure import Figure
+
+try:
+    import seaborn as sns
+    sns.set_theme(style="darkgrid")
+except Exception:
+    plt.style.use("seaborn-darkgrid")
 
 
 # ─── Constants & File Paths ───
@@ -209,16 +219,25 @@ class StockWidget(QWidget):
         self.combo_symbol.currentIndexChanged.connect(self.update_plot)
 
         self.combo_timescale = QComboBox()
-        self.combo_timescale.addItems(["Hour", "Day", "Week", "Month"])
+        self.combo_timescale.addItems(["Hour", "Day", "Week", "Month", "Custom"])
         self.combo_timescale.setCurrentText("Day")
         self.combo_timescale.setToolTip("Select timeframe for plot")
-        self.combo_timescale.currentIndexChanged.connect(self.update_plot)
+        self.combo_timescale.currentIndexChanged.connect(self.on_timescale_changed)
+
+        self.label_custom_days = QLabel("Days:")
+        self.spin_custom_days = QSpinBox()
+        self.spin_custom_days.setRange(1, 365)
+        self.spin_custom_days.setValue(7)
+        self.label_custom_days.setVisible(False)
+        self.spin_custom_days.setVisible(False)
 
         controls_layout.addWidget(QLabel("Symbol:"))
         controls_layout.addWidget(self.combo_symbol)
         controls_layout.addSpacing(40)
         controls_layout.addWidget(QLabel("Timeframe:"))
         controls_layout.addWidget(self.combo_timescale)
+        controls_layout.addWidget(self.label_custom_days)
+        controls_layout.addWidget(self.spin_custom_days)
         controls_layout.addStretch()
 
         main_layout.addLayout(controls_layout)
@@ -227,6 +246,8 @@ class StockWidget(QWidget):
         self.figure = Figure(figsize=(5, 3))
         self.canvas = FigureCanvas(self.figure)
         main_layout.addWidget(self.canvas, stretch=1)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        main_layout.addWidget(self.toolbar)
 
         # 3d) Add/Remove buttons
         btn_layout = QHBoxLayout()
@@ -308,6 +329,13 @@ class StockWidget(QWidget):
         if current_symbol in symbols_snapshot:
             self.combo_symbol.setCurrentText(current_symbol)
         self.combo_symbol.blockSignals(False)
+
+    def on_timescale_changed(self):
+        """Show or hide custom days spin box based on timeframe selection."""
+        is_custom = self.combo_timescale.currentText() == "Custom"
+        self.label_custom_days.setVisible(is_custom)
+        self.spin_custom_days.setVisible(is_custom)
+        self.update_plot()
 
 
     def on_data_fetched(self, data_dict):
@@ -568,6 +596,10 @@ class StockWidget(QWidget):
         elif timeframe == "Month":
             cutoff      = now - pd.Timedelta(days=30)
             yf_interval = "1h"
+        elif timeframe == "Custom":
+            days_back   = self.spin_custom_days.value()
+            cutoff      = now - pd.Timedelta(days=days_back)
+            yf_interval = "1h" if days_back > 30 else "30m"
         else:
             cutoff      = now - pd.Timedelta(days=1)
             yf_interval = "5m"
